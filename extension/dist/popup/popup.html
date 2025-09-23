@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Gambling Blocker</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <header>
+            <h1>🎰 Gambling Blocker</h1>
+            <p class="subtitle">Controle seus estímulos</p>
+        </header>
+
+        <section class="current-site">
+            <h3>Site Atual</h3>
+            <div id="current-site-info">Carregando...</div>
+        </section>
+
+        <section class="filters">
+            <h3>Filtros Visuais</h3>
+            
+            <div class="toggle-group">
+                <label class="toggle">
+                    <input type="checkbox" id="grayscale-toggle" checked>
+                    <span class="slider"></span>
+                    Tons de Cinza
+                </label>
+
+                <label class="toggle">
+                    <input type="checkbox" id="blur-toggle">
+                    <span class="slider"></span>
+                    Desfoque
+                </label>
+
+                <label class="toggle">
+                    <input type="checkbox" id="darken-toggle">
+                    <span class="slider"></span>
+                    Escurecer
+                </label>
+            </div>
+        </section>
+
+        <section class="audio">
+            <h3>Controle de Áudio</h3>
+            <label class="toggle">
+                <input type="checkbox" id="mute-toggle">
+                <span class="slider"></span>
+                Silenciar sites de apostas
+            </label>
+        </section>
+
+        <section class="manual-classification">
+            <h3>Classificação Manual</h3>
+            <div class="button-group">
+                <button id="mark-gambling" class="btn btn-danger">🚫 Marcar como Aposta</button>
+                <button id="mark-safe" class="btn btn-success">✅ Marcar como Seguro</button>
+            </div>
+        </section>
+
+        <footer>
+            <p class="version">v0.1.0</p>
+        </footer>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

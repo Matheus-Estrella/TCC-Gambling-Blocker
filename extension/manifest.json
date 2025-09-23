@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Gambling Blocker",
+  "version": "0.1.0",
+  "description": "Reduz estímulos visuais e auditivos em sites de apostas",
+  "icons": {
+    "16": "icons/Antitigrinho16.png",
+    "48": "icons/Antitigrinho48.png",
+    "128": "icons/Antitigrinho128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "dist/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["dist/content/content-script.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "dist/popup/popup.html",
+    "default_title": "Gambling Blocker"
+  }
+}
