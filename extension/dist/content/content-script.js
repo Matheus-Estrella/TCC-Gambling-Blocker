@@ -1,4 +1,4 @@
-// Content Script Simplificado - Sem Módulos
+// Content Script V0.2.0 - TypeScript Corrigido (Ordem Correta)
 console.log('🎰 Gambling Blocker Content Script carregado!');
 // ===== CONFIGURAÇÕES =====
 const GAMBLING_DOMAINS = [
@@ -12,6 +12,20 @@ const GAMBLING_KEYWORDS = [
     "blackjack", "bingo", "lottery", "wager", "stake", "odds",
     "aposta", "cassino", "pôquer", "jogo", "azar", "apostar"
 ];
+// ===== SISTEMA DE EXCEÇÕES =====
+let userExceptions = [];
+async function loadUserExceptions() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get({ exceptions: [] }, (result) => {
+            resolve(result.exceptions || []);
+        });
+    });
+}
+async function saveUserExceptions(exceptions) {
+    return new Promise((resolve) => {
+        chrome.storage.sync.set({ exceptions }, () => resolve());
+    });
+}
 // ===== FUNÇÕES UTILITÁRIAS =====
 function extractDomain(url) {
     try {
@@ -25,8 +39,14 @@ function extractDomain(url) {
         return url.toLowerCase();
     }
 }
-function isGamblingSite(url) {
+async function isGamblingSite(url) {
     const domain = extractDomain(url);
+    // Verifica se está na lista de exceções do usuário
+    const exceptions = await loadUserExceptions();
+    if (exceptions.includes(domain)) {
+        console.log('✅ Site está na lista de exceções - tratando como seguro');
+        return false;
+    }
     // Verifica domínios conhecidos
     const domainMatch = GAMBLING_DOMAINS.some(gamblingDomain => domain.includes(gamblingDomain));
     // Verifica palavras-chave
@@ -34,9 +54,7 @@ function isGamblingSite(url) {
     return domainMatch || keywordMatch;
 }
 function applyGrayscaleFilter() {
-    const existingStyle = document.getElementById('gambling-blocker-style');
-    if (existingStyle)
-        existingStyle.remove();
+    removeFilters();
     const style = document.createElement('style');
     style.id = 'gambling-blocker-style';
     style.textContent = `
@@ -44,8 +62,46 @@ function applyGrayscaleFilter() {
             filter: grayscale(100%) !important;
             -webkit-filter: grayscale(100%) !important;
         }
-        
-        .gambling-blocker-warning {
+    `;
+    document.head.appendChild(style);
+}
+function applyBlurFilter() {
+    removeFilters();
+    const style = document.createElement('style');
+    style.id = 'gambling-blocker-style';
+    style.textContent = `
+        html, body {
+            filter: blur(5px) !important;
+            -webkit-filter: blur(5px) !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+function applyDarkenFilter() {
+    removeFilters();
+    const style = document.createElement('style');
+    style.id = 'gambling-blocker-style';
+    style.textContent = `
+        html, body {
+            filter: brightness(0.5) !important;
+            -webkit-filter: brightness(0.5) !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+function removeFilters() {
+    const existingStyle = document.getElementById('gambling-blocker-style');
+    if (existingStyle)
+        existingStyle.remove();
+}
+function addWarningBanner() {
+    const existingBanner = document.querySelector('.gambling-blocker-warning');
+    if (existingBanner)
+        existingBanner.remove();
+    const banner = document.createElement('div');
+    banner.className = 'gambling-blocker-warning';
+    banner.innerHTML = `
+        <div style="
             position: fixed;
             top: 0;
             left: 0;
@@ -58,18 +114,35 @@ function applyGrayscaleFilter() {
             font-size: 14px;
             z-index: 10000;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
+        ">
+            ⚠️ Gambling Blocker: Site de apostas detectado. 
+            <button id="gambling-blocker-allow" style="
+                margin-left: 10px;
+                background: white;
+                color: #ff6b6b;
+                border: none;
+                padding: 2px 8px;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 12px;
+            ">Permitir este site</button>
+        </div>
     `;
-    document.head.appendChild(style);
-}
-function addWarningBanner() {
-    const existingBanner = document.querySelector('.gambling-blocker-warning');
-    if (existingBanner)
-        existingBanner.remove();
-    const banner = document.createElement('div');
-    banner.className = 'gambling-blocker-warning';
-    banner.innerHTML = '⚠️ Gambling Blocker: Site de apostas detectado. Filtros de segurança aplicados.';
     document.body.appendChild(banner);
+    // Adiciona evento ao botão de permitir
+    const allowButton = document.getElementById('gambling-blocker-allow');
+    if (allowButton) {
+        allowButton.addEventListener('click', async () => {
+            const domain = extractDomain(window.location.href);
+            const exceptions = await loadUserExceptions();
+            if (!exceptions.includes(domain)) {
+                exceptions.push(domain);
+                await saveUserExceptions(exceptions);
+                alert(`✅ ${domain} adicionado à lista de sites permitidos!`);
+                location.reload();
+            }
+        });
+    }
 }
 function mutePageAudio() {
     const mediaElements = document.querySelectorAll('video, audio');
@@ -81,13 +154,11 @@ function observeNewMediaElements() {
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === 1) {
+                if (node.nodeType === 1) { // ELEMENT_NODE
                     const element = node;
-                    // Muta novos elementos de áudio/vídeo
                     if (element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
                         element.muted = true;
                     }
-                    // Muta elementos dentro do novo nó
                     const mediaElements = element.querySelectorAll('video, audio');
                     mediaElements.forEach(media => {
                         media.muted = true;
@@ -101,48 +172,74 @@ function observeNewMediaElements() {
         subtree: true
     });
 }
+// ===== APLICAÇÃO DE EFEITOS =====
+async function applyEffects() {
+    const settings = await new Promise((resolve) => {
+        chrome.storage.sync.get({
+            grayscale: true,
+            blur: false,
+            darken: false,
+            muteAudio: false
+        }, resolve);
+    });
+    console.log('⚙️ Configurações carregadas:', settings);
+    // Aplica filtro visual baseado nas configurações
+    if (settings.grayscale) {
+        applyGrayscaleFilter();
+    }
+    else if (settings.blur) {
+        applyBlurFilter();
+    }
+    else if (settings.darken) {
+        applyDarkenFilter();
+    }
+    addWarningBanner();
+    // Aplica mute de áudio se configurado
+    if (settings.muteAudio) {
+        mutePageAudio();
+        observeNewMediaElements();
+    }
+}
+// ===== OUVINTE DE MUDANÇAS DE CONFIGURAÇÃO =====
+function setupConfigListener() {
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'sync') {
+            console.log('🔄 Configurações alteradas, reaplicando efeitos...');
+            // Verifica se as configurações relevantes foram alteradas
+            const relevantChanges = ['grayscale', 'blur', 'darken', 'muteAudio'];
+            const hasRelevantChange = Object.keys(changes).some(key => relevantChanges.includes(key));
+            if (hasRelevantChange) {
+                applyEffects();
+            }
+        }
+    });
+}
 // ===== FUNÇÃO PRINCIPAL =====
-function initializeGamblingBlocker() {
+async function initializeGamblingBlocker() {
     const url = window.location.href;
-    const gamblingSite = isGamblingSite(url);
+    const gamblingSite = await isGamblingSite(url);
     console.log('🔍 Gambling Blocker analisando:', url);
     console.log('🎯 É site de aposta?:', gamblingSite);
     if (gamblingSite) {
-        // Carrega configurações do usuário
-        chrome.storage.sync.get({
-            grayscale: true,
-            muteAudio: false
-        }, (settings) => {
-            console.log('⚙️ Configurações carregadas:', settings);
-            // Aplica filtro visual (grayscale padrão)
-            if (settings.grayscale) {
-                applyGrayscaleFilter();
-                addWarningBanner();
-            }
-            // Aplica mute de áudio se configurado
-            if (settings.muteAudio) {
-                mutePageAudio();
-                observeNewMediaElements();
-            }
-        });
+        await applyEffects();
+        setupConfigListener();
         // Observa mudanças de URL (para SPAs)
         let lastUrl = url;
         const urlObserver = new MutationObserver(() => {
             if (window.location.href !== lastUrl) {
                 lastUrl = window.location.href;
                 console.log('🔄 URL mudou, reanalisando...');
-                // Recarrega a extensão após mudança de URL
-                setTimeout(() => {
+                setTimeout(async () => {
                     const newUrl = window.location.href;
-                    const stillGambling = isGamblingSite(newUrl);
+                    const stillGambling = await isGamblingSite(newUrl);
                     if (!stillGambling) {
-                        // Remove filtros se não for mais site de aposta
-                        const style = document.getElementById('gambling-blocker-style');
-                        if (style)
-                            style.remove();
+                        removeFilters();
                         const banner = document.querySelector('.gambling-blocker-warning');
                         if (banner)
                             banner.remove();
+                    }
+                    else {
+                        await applyEffects();
                     }
                 }, 100);
             }
@@ -155,7 +252,9 @@ function initializeGamblingBlocker() {
 }
 // ===== INICIALIZAÇÃO =====
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeGamblingBlocker);
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeGamblingBlocker();
+    });
 }
 else {
     initializeGamblingBlocker();
