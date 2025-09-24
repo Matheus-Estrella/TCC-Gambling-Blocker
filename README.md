@@ -36,6 +36,7 @@ extension/
 
 ## 📂 Estrutura do Projeto
 
+```
 TCC-Gambling-Blocker/
  │
  ├── extension/ # Código-fonte da extensão
@@ -53,7 +54,7 @@ TCC-Gambling-Blocker/
  ├── package.json # Dependências do projeto e scripts npm
  ├── tsconfig.json # Configuração do TypeScript
  └── README.md # Documentação
-
+```
 ---
 
 ## 👨‍💻 Para Desenvolvedores
