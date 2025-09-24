@@ -37,20 +37,22 @@ extension/
 ## 📂 Estrutura do Projeto
 
 TCC-Gambling-Blocker/
-│
-├── extension/ # Código-fonte da extensão
-│ ├── manifest.json # Manifesto da extensão (configuração principal)
-│ ├── background.ts # Script de background (gerencia bloqueio em segundo plano)
-│ ├── content.ts # Script injetado nas páginas bloqueadas
-│ ├── popup.html # Interface do popup da extensão
-│ ├── popup.ts # Lógica do popup
-│ ├── styles.css # Estilos da interface
-│ └── ... # Outros utilitários
-│
-├── .gitignore
-├── package.json # Dependências do projeto
-├── tsconfig.json # Configuração do TypeScript
-└── README.md # Documentação
+ │
+ ├── extension/ # Código-fonte da extensão
+ │ ├── manifest.json # Manifesto da extensão (configura permissões e scripts)
+ │ ├── background.ts # Script em segundo plano (coordena bloqueios e regras)
+ │ ├── content.ts # Script injetado nas páginas (aplica bloqueios visuais e sonoros)
+ │ ├── popup.html # Interface do popup exibida ao clicar no ícone
+ │ ├── popup.ts # Lógica do popup (interação do usuário com a extensão)
+ │ ├── options.html # Página de configurações adicionais (se houver)
+ │ ├── options.ts # Lógica da tela de opções
+ │ ├── styles.css # Estilos globais da interface
+ │ └── utils.ts # Funções auxiliares reutilizadas
+ │
+ ├── .gitignore # Arquivos e pastas ignorados pelo Git
+ ├── package.json # Dependências do projeto e scripts npm
+ ├── tsconfig.json # Configuração do TypeScript
+ └── README.md # Documentação
 
 ---
 
