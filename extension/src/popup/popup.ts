@@ -1,5 +1,5 @@
-// Popup Script V0.2.0 - Corrigido
-console.log('🎰 Gambling Blocker Popup carregado!');
+// Popup Script V0.3.0 - Com Melhor UX
+console.log('🎰 Gambling Blocker Popup v0.3.0 carregado!');
 
 interface ExtensionSettings {
     grayscale: boolean;
@@ -22,28 +22,51 @@ class GamblingBlockerPopup {
     private currentUrl: string = '';
     private currentDomain: string = '';
     private isGamblingSite: boolean = false;
+    private isLoading: boolean = true;
 
     constructor() {
         this.initialize();
     }
 
     private async initialize(): Promise<void> {
-        await this.loadCurrentTab();
-        await this.loadSettings();
-        await this.analyzeCurrentSite();
-        this.updateUI();
-        this.setupEventListeners();
+        try {
+            await this.showLoadingState(true);
+            await this.loadCurrentTab();
+            await this.loadSettings();
+            await this.analyzeCurrentSite();
+            this.updateUI();
+            this.setupEventListeners();
+            await this.showLoadingState(false);
+        } catch (error) {
+            console.error('Erro ao inicializar popup:', error);
+            this.showNotification('Erro ao carregar a extensão', 'error');
+            await this.showLoadingState(false);
+        }
+    }
+
+    private async showLoadingState(loading: boolean): Promise<void> {
+        this.isLoading = loading;
+        const container = document.querySelector('.popup-container') as HTMLElement;
+        if (container) {
+            if (loading) {
+                container.classList.add('loading');
+            } else {
+                container.classList.remove('loading');
+            }
+        }
     }
 
     private async loadCurrentTab(): Promise<void> {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
                 if (tabs[0]) {
                     this.currentTab = tabs[0];
                     this.currentUrl = tabs[0].url || '';
                     this.currentDomain = this.extractDomain(this.currentUrl);
+                    resolve();
+                } else {
+                    reject(new Error('Nenhuma aba encontrada'));
                 }
-                resolve();
             });
         });
     }
@@ -58,7 +81,10 @@ class GamblingBlockerPopup {
     }
 
     private async analyzeCurrentSite(): Promise<void> {
-        if (!this.currentUrl) return;
+        if (!this.currentUrl) {
+            this.isGamblingSite = false;
+            return;
+        }
 
         // Verifica se está na lista de exceções
         if (this.settings.exceptions.includes(this.currentDomain)) {
@@ -115,23 +141,31 @@ class GamblingBlockerPopup {
 
     private updateSiteInfo(): void {
         const siteInfo = document.getElementById('current-site-info');
-        if (!siteInfo || !this.currentDomain) return;
+        if (!siteInfo || !this.currentDomain) {
+            siteInfo!.innerHTML = '<strong>Nenhum site detectado</strong>';
+            return;
+        }
 
+        siteInfo.className = '';
+        
         if (this.settings.exceptions.includes(this.currentDomain)) {
             siteInfo.innerHTML = `
                 <strong>${this.currentDomain}</strong><br>
                 <span style="color: #51cf66;">✅ Site permitido (exceção)</span>
             `;
+            siteInfo.classList.add('site-exception');
         } else if (this.isGamblingSite) {
             siteInfo.innerHTML = `
                 <strong>${this.currentDomain}</strong><br>
                 <span style="color: #ff6b6b;">🚫 Site de aposta detectado</span>
             `;
+            siteInfo.classList.add('site-gambling');
         } else {
             siteInfo.innerHTML = `
                 <strong>${this.currentDomain}</strong><br>
                 <span style="color: #51cf66;">✅ Site seguro</span>
             `;
+            siteInfo.classList.add('site-safe');
         }
     }
 
@@ -139,18 +173,23 @@ class GamblingBlockerPopup {
         const markGamblingBtn = document.getElementById('mark-gambling') as HTMLButtonElement;
         const markSafeBtn = document.getElementById('mark-safe') as HTMLButtonElement;
 
+        if (!markGamblingBtn || !markSafeBtn) return;
+
         if (this.settings.exceptions.includes(this.currentDomain)) {
             markGamblingBtn.disabled = false;
             markSafeBtn.disabled = true;
             markSafeBtn.textContent = '✅ Já permitido';
+            markGamblingBtn.textContent = '🚫 Marcar como Aposta';
         } else if (this.isGamblingSite) {
             markGamblingBtn.disabled = true;
             markSafeBtn.disabled = false;
             markGamblingBtn.textContent = '🚫 Já classificado como aposta';
+            markSafeBtn.textContent = '✅ Marcar como Seguro';
         } else {
             markGamblingBtn.disabled = false;
             markSafeBtn.disabled = true;
             markGamblingBtn.textContent = '🚫 Marcar como Aposta';
+            markSafeBtn.textContent = '✅ Marcar como Seguro';
         }
     }
 
@@ -173,13 +212,15 @@ class GamblingBlockerPopup {
         toggles.forEach(({ id, key }) => {
             const element = document.getElementById(id) as HTMLInputElement;
             if (element) {
-                element.addEventListener('change', (e) => {
+                element.addEventListener('change', async (e) => {
                     const target = e.target as HTMLInputElement;
                     if (key === 'grayscale') this.settings.grayscale = target.checked;
                     if (key === 'blur') this.settings.blur = target.checked;
                     if (key === 'darken') this.settings.darken = target.checked;
                     if (key === 'muteAudio') this.settings.muteAudio = target.checked;
-                    this.saveSettings();
+                    
+                    await this.saveSettings();
+                    this.showNotification('Configurações salvas!', 'success');
                 });
             }
         });
@@ -203,37 +244,46 @@ class GamblingBlockerPopup {
     }
 
     private async markCurrentSite(isGambling: boolean): Promise<void> {
-        if (!this.currentDomain) return;
+        if (!this.currentDomain) {
+            this.showNotification('Nenhum site detectado', 'error');
+            return;
+        }
 
-        let newExceptions = [...this.settings.exceptions];
+        try {
+            await this.showLoadingState(true);
+            
+            let newExceptions = [...this.settings.exceptions];
 
-        if (isGambling) {
-            // Remove das exceções (marca como aposta)
-            newExceptions = newExceptions.filter(domain => domain !== this.currentDomain);
-        } else {
-            // Adiciona às exceções (marca como seguro)
-            if (!newExceptions.includes(this.currentDomain)) {
-                newExceptions.push(this.currentDomain);
+            if (isGambling) {
+                // Remove das exceções (marca como aposta)
+                newExceptions = newExceptions.filter(domain => domain !== this.currentDomain);
+                this.showNotification(`🚫 ${this.currentDomain} marcado como aposta`, 'success');
+            } else {
+                // Adiciona às exceções (marca como seguro)
+                if (!newExceptions.includes(this.currentDomain)) {
+                    newExceptions.push(this.currentDomain);
+                }
+                this.showNotification(`✅ ${this.currentDomain} permitido`, 'success');
             }
+
+            this.settings.exceptions = newExceptions;
+            await this.saveSettings();
+            
+            // Atualiza a UI
+            await this.analyzeCurrentSite();
+            this.updateUI();
+
+            // Recarrega a aba atual para aplicar mudanças
+            if (this.currentTab && this.currentTab.id) {
+                chrome.tabs.reload(this.currentTab.id);
+            }
+
+        } catch (error) {
+            console.error('Erro ao marcar site:', error);
+            this.showNotification('Erro ao salvar configuração', 'error');
+        } finally {
+            await this.showLoadingState(false);
         }
-
-        this.settings.exceptions = newExceptions;
-        await this.saveSettings();
-        
-        // Atualiza a UI
-        await this.analyzeCurrentSite();
-        this.updateUI();
-
-        // Recarrega a aba atual para aplicar mudanças
-        if (this.currentTab && this.currentTab.id) {
-            chrome.tabs.reload(this.currentTab.id);
-        }
-
-        const message = isGambling ? 
-            `🚫 ${this.currentDomain} marcado como site de aposta` : 
-            `✅ ${this.currentDomain} adicionado à lista de sites permitidos`;
-        
-        this.showNotification(message);
     }
 
     private async saveSettings(): Promise<void> {
@@ -245,9 +295,27 @@ class GamblingBlockerPopup {
         });
     }
 
-    private showNotification(message: string): void {
-        // Usando alert simples por enquanto
-        alert(message);
+    private showNotification(message: string, type: 'success' | 'error' | 'warning' = 'success'): void {
+        // Remove notificação existente
+        const existingNotification = document.querySelector('.notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        // Cria nova notificação
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // Animação de entrada
+        setTimeout(() => notification.classList.add('show'), 10);
+
+        // Remove após 3 segundos
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 }
 
